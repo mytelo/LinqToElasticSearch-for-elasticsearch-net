@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using AutoFixture;
-using Elasticsearch.Net;
 using FluentAssertions;
-using Nest;
 using Xunit;
 
 namespace LinqToElasticSearch.IntegrationTests.MainFrom
@@ -396,7 +394,7 @@ namespace LinqToElasticSearch.IntegrationTests.MainFrom
             var byMemory = Sut.Where(x => x.Name == items[0].Name);
 
             byElastic = byElastic.Where(item => item.Age == items[0].Age);
-                
+
             byElastic = byElastic.Where(item =>
                     (item.FolderId == null && (false || allowedTypes.Contains(item.TypeId)))
                     || (item.FolderId != null && allowedFolders.Contains(item.FolderId.Value))
@@ -602,7 +600,7 @@ namespace LinqToElasticSearch.IntegrationTests.MainFrom
         {
             // Given
             var samples = Fixture.CreateMany<SampleData>().ToList();
-            var searchEmail = samples[1].Emails[1][..^1];
+            var searchEmail = samples[1].Emails[1];
 
             // When
             Bulk(samples);

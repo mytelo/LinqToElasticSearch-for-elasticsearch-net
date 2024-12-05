@@ -1,6 +1,5 @@
 using System.Collections.Generic;
-using Nest;
-
+using Elastic.Clients.Elasticsearch.QueryDsl;
 namespace LinqToElasticSearch
 {
     public class OrNode : Node
@@ -10,7 +9,7 @@ namespace LinqToElasticSearch
 
         private readonly IList<Node> _optimizedNodes = new List<Node>();
 
-        public override QueryContainer Accept(INodeVisitor visitor)
+        public override Query Accept(INodeVisitor visitor)
         {
             return visitor.Visit(this);
         }

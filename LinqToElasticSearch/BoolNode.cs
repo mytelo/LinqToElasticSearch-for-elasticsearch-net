@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Nest;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 
 namespace LinqToElasticSearch
 {
@@ -17,7 +17,7 @@ namespace LinqToElasticSearch
             }
         }
 
-        public override QueryContainer Accept(INodeVisitor visitor)
+        public override Query Accept(INodeVisitor visitor)
         {
             return visitor.Visit(this);
         }

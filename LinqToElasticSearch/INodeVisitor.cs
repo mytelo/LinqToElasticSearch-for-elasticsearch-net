@@ -1,22 +1,22 @@
-using Nest;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 
 namespace LinqToElasticSearch
 {
     public interface INodeVisitor
     {
-        QueryContainer Visit(BoolNode node);
-        QueryContainer Visit(OrNode node);
-        QueryContainer Visit(AndNode node);
-        QueryContainer Visit(NotNode node);
-        QueryContainer Visit(TermNode node);
-        QueryContainer Visit(TermsNode node);
-        QueryContainer Visit(TermsSetNode node);
-        QueryContainer Visit(ExistsNode node);
-        QueryContainer Visit(NotExistsNode node);
-        QueryContainer Visit(DateRangeNode node);
-        QueryContainer Visit(MatchPhraseNode node);
-        QueryContainer Visit(NumericRangeNode node);
-        QueryContainer Visit(QueryStringNode node);
-        QueryContainer Visit(MultiMatchNode node);
+        Query Visit(BoolNode node);
+        Query Visit(OrNode node);
+        Query Visit(AndNode node);
+        Query Visit(NotNode node);
+        Query Visit(TermNode node);
+        Query Visit(TermsNode node);
+        Query Visit(TermsSetNode node);
+        Query Visit(ExistsNode node);
+        Query Visit(NotExistsNode node);
+        Query Visit(DateRangeNode node);
+        Query Visit(MatchPhraseNode node);
+        Query Visit(NumericRangeNode node);
+        Query Visit(QueryStringNode node);
+        Query Visit(MultiMatchNode node);
     }
 }

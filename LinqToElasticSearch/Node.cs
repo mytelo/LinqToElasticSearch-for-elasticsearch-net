@@ -1,9 +1,9 @@
-﻿using Nest;
+﻿using Elastic.Clients.Elasticsearch.QueryDsl;
 
 namespace LinqToElasticSearch
 {
     public abstract class Node
     {
-        public abstract QueryContainer Accept(INodeVisitor visitor);
+        public abstract Query Accept(INodeVisitor visitor);
     }
 }

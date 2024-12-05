@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Linq;
 using AutoFixture;
-using LinqToElasticSearch.Extensions;
 using FluentAssertions;
+using LinqToElasticSearch.Extensions;
 using Xunit;
 
 namespace LinqToElasticSearch.IntegrationTests.Clauses.OrderByTypes

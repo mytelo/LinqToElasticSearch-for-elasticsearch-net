@@ -1,4 +1,4 @@
-using Nest;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 
 namespace LinqToElasticSearch
 {
@@ -13,7 +13,7 @@ namespace LinqToElasticSearch
             Value = value;
         }
 
-        public override QueryContainer Accept(INodeVisitor visitor)
+        public override Query Accept(INodeVisitor visitor)
         {
             return visitor.Visit(this);
         }

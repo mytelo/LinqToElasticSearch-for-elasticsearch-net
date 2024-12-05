@@ -1,29 +1,30 @@
 ﻿using System.Linq;
-using Nest;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 
 namespace LinqToElasticSearch
 {
     public class NodeVisitor : INodeVisitor
     {
-        public QueryContainer Visit(BoolNode node)
+        public Query Visit(BoolNode node)
         {
             var queries = node.Children.Select(x => x.Accept(this));
-            return new BoolQuery { Should = queries };
+            return new BoolQuery { Should = queries.ToList() };
         }
 
-        public QueryContainer Visit(OrNode node)
+        public Query Visit(OrNode node)
         {
             return new BoolNode(node.Optimize()).Accept(this);
         }
 
-        public QueryContainer Visit(AndNode node)
+        public Query Visit(AndNode node)
         {
             var left = node.Left.Accept(this);
             var right = node.Right.Accept(this);
             return new BoolQuery { Must = new[] { left, right } };
         }
 
-        public QueryContainer Visit(NotNode node)
+        public Query Visit(NotNode node)
         {
             var child = node.Child.Accept(this);
 
@@ -33,46 +34,59 @@ namespace LinqToElasticSearch
             };
         }
 
-        public QueryContainer Visit(TermNode node)
+        public Query Visit(TermNode node)
         {
-            return new TermQuery
+            if (node.Field == null && node.Value is bool v && v == true)
             {
-                Field = node.Field,
-                Name = node.Field,
-                Value = node.Value
+                //match all
+                return new MatchAllQuery();
+            }
+
+            if (node.Field == null && node.Value is bool v2 && v2 == false)
+            {
+                //match none
+                return new MatchNoneQuery();
+            }
+
+            return new TermQuery(node.Field)
+            {
+                Value = GetFieldValue(node.Value)
             };
         }
 
-        public QueryContainer Visit(TermsNode node)
+        public Query Visit(TermsNode node)
         {
-            return new TermsQuery
+            return new TermsQuery()
             {
                 Field = node.Field,
-                Name = node.Field,
-                IsVerbatim = true,
-                Terms = node.Values
+                QueryName = node.Field,
+                Terms = new TermsQueryField(node.Values.Select(GetFieldValue).ToList())
             };
         }
 
-        public QueryContainer Visit(TermsSetNode node)
+        public Query Visit(TermsSetNode node)
         {
-            return new TermsSetQuery
+            return new TermsSetQuery(node.Field)
             {
-                Field = node.Field,
-                Name = node.Field,
-                IsVerbatim = true,
-                Terms = node.Values,
+                QueryName = node.Field,
+                Terms = node.Values.Select(GetFieldValue).ToList(),
                 MinimumShouldMatchScript = node.Equal
-                    ? new InlineScript($"doc['{node.Field}'].length")
-                    : new InlineScript("0")
+                    ? new Script
+                    {
+                        Source = $"doc['{node.Field}'].length"
+                    }
+                    : new Script
+                    {
+                        Source = "0"
+                    }
             };
         }
 
-        public QueryContainer Visit(ExistsNode node)
+        public Query Visit(ExistsNode node)
         {
             return new BoolQuery
             {
-                Must = new QueryContainer[]
+                Must = new Query[]
                 {
                     new ExistsQuery
                     {
@@ -82,11 +96,11 @@ namespace LinqToElasticSearch
             };
         }
 
-        public QueryContainer Visit(NotExistsNode node)
+        public Query Visit(NotExistsNode node)
         {
             return new BoolQuery
             {
-                MustNot = new QueryContainer[]
+                MustNot = new Query[]
                 {
                     new ExistsQuery
                     {
@@ -96,62 +110,93 @@ namespace LinqToElasticSearch
             };
         }
 
-        public QueryContainer Visit(DateRangeNode node)
+        public Query Visit(DateRangeNode node)
         {
-            return new DateRangeQuery
+            return new DateRangeQuery(node.Field)
             {
-                Field = node.Field,
-                Name = node.Field,
-                LessThan = node.LessThan,
-                LessThanOrEqualTo = node.LessThanOrEqualTo,
-                GreaterThan = node.GreaterThan,
-                GreaterThanOrEqualTo = node.GreaterThanOrEqualTo
+                QueryName = node.Field,
+                Lt = node.LessThan,
+                Lte = node.LessThanOrEqualTo,
+                Gt = node.GreaterThan,
+                Gte = node.GreaterThanOrEqualTo
             };
         }
 
-        public QueryContainer Visit(MatchPhraseNode node)
+        public Query Visit(MatchPhraseNode node)
         {
-            return new MatchPhraseQuery
+            return new MatchPhraseQuery(node.Field)
             {
-                Field = node.Field,
-                Name = node.Field,
+                QueryName = node.Field,
                 Query = (string)node.Value
             };
         }
 
-        public QueryContainer Visit(NumericRangeNode node)
+        public Query Visit(NumericRangeNode node)
         {
-            return new NumericRangeQuery
+            return new NumberRangeQuery(node.Field)
             {
-                Field = node.Field,
-                Name = node.Field,
-                LessThan = node.LessThan,
-                LessThanOrEqualTo = node.LessThanOrEqualTo,
-                GreaterThan = node.GreaterThan,
-                GreaterThanOrEqualTo = node.GreaterThanOrEqualTo
+                QueryName = node.Field,
+                Lt = node.LessThan,
+                Lte = node.LessThanOrEqualTo,
+                Gt = node.GreaterThan,
+                Gte = node.GreaterThanOrEqualTo
             };
         }
 
-        public QueryContainer Visit(QueryStringNode node)
+        public Query Visit(QueryStringNode node)
         {
             return new QueryStringQuery
             {
                 Fields = new[] { node.Field },
-                Name = node.Field,
+                QueryName = node.Field,
                 Query = (string)node.Value
             };
         }
 
-        public QueryContainer Visit(MultiMatchNode node)
+        public Query Visit(MultiMatchNode node)
         {
             return new MultiMatchQuery
             {
                 Fields = new[] { node.Field },
-                Name = node.Field,
+                QueryName = node.Field,
                 Type = TextQueryType.PhrasePrefix,
                 Query = (string)node.Value,
                 MaxExpansions = 200
             };
+        }
+
+        private FieldValue GetFieldValue(object value)
+        {
+            switch (value)
+            {
+                case string v:
+                {
+                    return FieldValue.String(v);
+                }
+                case bool v:
+                {
+                    return FieldValue.Boolean(v);
+                }
+                case long v:
+                {
+                    return FieldValue.Long(v);
+                }
+                case float v:
+                {
+                    return FieldValue.Double(v);
+                }
+                case double v:
+                {
+                    return FieldValue.Double(v);
+                }
+                case decimal v:
+                {
+                    return FieldValue.Double((double)v);
+                }
+                default :
+                    return FieldValue.String(value.ToString());
+            }
+
         }
     }
 }

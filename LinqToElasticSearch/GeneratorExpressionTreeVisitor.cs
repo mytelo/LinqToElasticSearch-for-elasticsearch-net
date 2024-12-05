@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using Elasticsearch.Net;
-using Nest;
+using Elastic.Clients.Elasticsearch.Serialization;
 using Remotion.Linq.Clauses;
 using Remotion.Linq.Clauses.Expressions;
 using Remotion.Linq.Clauses.ResultOperators;
@@ -72,19 +71,87 @@ namespace LinqToElasticSearch
 
             if (expression.NodeType == ExpressionType.OrElse)
             {
-                node = new OrNode
+                var left = QueryMap[expression.Left];
+                var right = QueryMap[expression.Right];
+
+                //true
+                if (left is TermNode ltn && ltn.Value is bool lbv && lbv == true)
                 {
-                    Left = QueryMap[expression.Left],
-                    Right = QueryMap[expression.Right]
-                };
+                    right = null;
+                }
+                if (right is TermNode rtn && rtn.Value is bool rbv && rbv == true)
+                {
+                    left = null;
+                }
+
+                //false
+                if (left is TermNode ltn2 && ltn2.Value is bool lbv2 && lbv2 == false)
+                {
+                    left = null;
+                }
+                if (right is TermNode rtn2 && rtn2.Value is bool rbv2 && rbv2 == false)
+                {
+                    right = null;
+                }
+
+                if (left != null && right != null)
+                {
+                    node = new OrNode
+                    {
+                        Left = QueryMap[expression.Left],
+                        Right = QueryMap[expression.Right]
+                    };
+                }
+                else if (left == null && right != null)
+                {
+                    node = right;
+                }
+                else if (left != null)
+                {
+                    node = left;
+                }
             }
             else if (expression.NodeType == ExpressionType.AndAlso)
             {
-                node = new AndNode
+                var left = QueryMap[expression.Left];
+                var right = QueryMap[expression.Right];
+
+                //false
+                if (left is TermNode ltn && ltn.Value is bool lbv && lbv == false)
                 {
-                    Left = QueryMap[expression.Left],
-                    Right = QueryMap[expression.Right]
-                };
+                    right = null;
+                }
+                if (right is TermNode rtn && rtn.Value is bool rbv && rbv == false)
+                {
+                    left = null;
+                }
+
+                //true
+                if (left is TermNode ltn2 && ltn2.Value is bool lbv2 && lbv2 == true)
+                {
+                    left = null;
+                }
+                if (right is TermNode rtn2 && rtn2.Value is bool rbv2 && rbv2 == true)
+                {
+                    right = null;
+                }
+
+                if (left != null && right != null)
+                {
+                    node = new AndNode
+                    {
+                        Left = QueryMap[expression.Left],
+                        Right = QueryMap[expression.Right]
+                    };
+                }
+                else if (left == null && right != null)
+                {
+                    node = right;
+                }
+                else if (left != null)
+                {
+                    node = left;
+                }
             }
 
             if (node != null)
@@ -369,7 +436,7 @@ namespace LinqToElasticSearch
             {
                 Value = guid.ToString();
             }
-            
+
             switch (expression.NodeType)
             {
                 case ExpressionType.Equal:

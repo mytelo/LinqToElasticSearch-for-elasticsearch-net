@@ -50,11 +50,12 @@ namespace LinqToElasticSearch.IntegrationTests.Clauses.GroupByTypes
             datas[0].Date = date;
             datas[0].SampleTypeProperty = SampleType.Sample;
             datas[0].Can = true;
+            datas[0].EnumNullable = null;
 
             datas[1].Date = date;
             datas[1].SampleTypeProperty = SampleType.Sample;
             datas[1].Can = true;
-            
+
             datas[2].Date = date;
             datas[2].SampleTypeProperty = SampleType.Type;
             datas[2].Can = true;
@@ -66,7 +67,7 @@ namespace LinqToElasticSearch.IntegrationTests.Clauses.GroupByTypes
             datas[4].Date = date.AddDays(1);
             datas[4].SampleTypeProperty = SampleType.SampleType;
             datas[4].Can = false;
-            
+
             datas[5].Date = date.AddDays(1);
             datas[5].SampleTypeProperty = SampleType.SampleType;
             datas[5].Can = true;

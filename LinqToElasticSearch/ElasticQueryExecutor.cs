@@ -5,51 +5,51 @@ using System.ComponentModel;
 using System.Dynamic;
 using System.Linq;
 using System.Linq.Expressions;
-using Nest;
-using Newtonsoft.Json;
+using System.Text.Json;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Aggregations;
+using Elastic.Clients.Elasticsearch.Core.Search;
+using Elastic.Clients.Elasticsearch.QueryDsl;
+using Elastic.Transport;
+using Elastic.Transport.Extensions;
 using Remotion.Linq;
 using Remotion.Linq.Clauses;
 using Remotion.Linq.Clauses.ResultOperators;
 
 namespace LinqToElasticSearch
 {
-    public class ElasticQueryExecutor<TK>: IQueryExecutor
+    public class ElasticQueryExecutor<TK> : IQueryExecutor
     {
-        private readonly IElasticClient _elasticClient;
+        private readonly ElasticsearchClient _elasticClient;
+        private readonly Serializer _sourceSerializer;
         private readonly string _dataId;
         private readonly PropertyNameInferrerParser _propertyNameInferrerParser;
         private readonly ElasticGeneratorQueryModelVisitor<TK> _elasticGeneratorQueryModelVisitor;
-        private readonly JsonSerializerSettings _deserializerSettings;
         private const int ElasticQueryLimit = 10000;
-            
-        public ElasticQueryExecutor(IElasticClient elasticClient, string dataId)
+
+        public ElasticQueryExecutor(ElasticsearchClient elasticClient, string dataId)
         {
             _elasticClient = elasticClient;
+            _sourceSerializer = elasticClient.SourceSerializer;
             _dataId = dataId;
             _propertyNameInferrerParser = new PropertyNameInferrerParser(_elasticClient);
             _elasticGeneratorQueryModelVisitor = new ElasticGeneratorQueryModelVisitor<TK>(_propertyNameInferrerParser);
-            _deserializerSettings = new JsonSerializerSettings
-            {
-                // Nest maps TimeSpan as a long (TimeSpan ticks)
-                Converters = new List<JsonConverter>
-                {
-                    new TimeSpanConverter(),
-                    new TimeSpanNullableConverter()
-                }
-            };
         }
 
         public IEnumerable<T> ExecuteCollection<T>(QueryModel queryModel)
         {
             var queryAggregator = _elasticGeneratorQueryModelVisitor.GenerateElasticQuery<T>(queryModel);
 
-            var documents= _elasticClient.Search<IDictionary<string, object>>(descriptor =>
+            var documents = _elasticClient.SearchAsync<IDictionary<string, object>>(descriptor =>
             {
                 descriptor.Index(_dataId);
 
                 if (queryModel.SelectClause != null && queryModel.SelectClause.Selector is MemberExpression memberExpression)
                 {
-                    descriptor.Source(x => x.Includes(f => f.Field(_propertyNameInferrerParser.Parser(memberExpression.Member.Name))));
+                    descriptor.Source(new SourceConfig(new SourceFilter
+                    {
+                        Includes = _propertyNameInferrerParser.Parser(memberExpression.Member.Name)
+                    }));
                 }
 
                 if (queryAggregator.Skip != null)
@@ -65,117 +65,113 @@ namespace LinqToElasticSearch
                 {
                     var take = queryAggregator.Take.Value;
                     var skip = queryAggregator.Skip ?? 0;
-                    
+
                     if (skip + take > ElasticQueryLimit)
                     {
                         var exceedCount = skip + take - ElasticQueryLimit;
                         take -= exceedCount;
                     }
-                    
-                    descriptor.Take(take);
+
+                    descriptor.From(take);
                     descriptor.Size(take);
                 }
-                
+
                 if (queryAggregator.Query != null)
                 {
-                    descriptor.Query(q => queryAggregator.Query);
+                    descriptor.Query(queryAggregator.Query);
                 }
                 else
                 {
-                    descriptor.MatchAll();
+                    descriptor.Query(q => q.MatchAll(new MatchAllQuery()));
                 }
-
 
                 if (queryAggregator.OrderByExpressions.Any())
                 {
-                    descriptor.Sort(d =>
+                    var sortOptionsCollection = new List<SortOptions>();
+                    foreach (var orderByExpression in queryAggregator.OrderByExpressions)
                     {
-                        foreach (var orderByExpression in queryAggregator.OrderByExpressions)
+                        var property = _propertyNameInferrerParser.Parser(orderByExpression.PropertyName) +
+                                       orderByExpression.GetKeywordIfNecessary();
+                        sortOptionsCollection.Add(SortOptions.Field(property, new FieldSort
                         {
-                            var property = _propertyNameInferrerParser.Parser(orderByExpression.PropertyName) +
-                                           orderByExpression.GetKeywordIfNecessary();
-                            d.Field(property,
-                                orderByExpression.OrderingDirection == OrderingDirection.Asc
-                                    ? SortOrder.Ascending
-                                    : SortOrder.Descending);
-                        }
+                            Order = orderByExpression.OrderingDirection == OrderingDirection.Asc
+                                ? SortOrder.Asc
+                                : SortOrder.Desc
+                        }));
+                    }
 
-                        return d;
-                    });
+                    descriptor.Sort(sortOptionsCollection);
                 }
 
                 if (queryAggregator.GroupByExpressions.Any())
                 {
                     descriptor.Aggregations(a =>
-                    {
+                       a.Add("composite", ad =>
+                       {
+                           var compositeAggregation = new CompositeAggregation
+                           {
+                               Sources = new List<IDictionary<string, CompositeAggregationSource>>()
+                           };
+                           queryAggregator.GroupByExpressions.ForEach(gbe =>
+                           {
+                               var field = _propertyNameInferrerParser.Parser(gbe.ElasticFieldName) + gbe.GetKeywordIfNecessary();
 
-                        a.Composite("composite", c =>
-                                c.Sources(so =>
-                                {
-                                    queryAggregator.GroupByExpressions.ForEach(gbe =>
-                                    {
-                                        var field = _propertyNameInferrerParser.Parser(gbe.ElasticFieldName) + gbe.GetKeywordIfNecessary();
-                                        so.Terms($"group_by_{gbe.PropertyName}", t => t.Field(field));
-                                    });
+                               var compositeAggregationSources = new Dictionary<string, CompositeAggregationSource>
+                               { { $"group_by_{gbe.PropertyName}", new CompositeAggregationSource
+                               {
+                                   Terms = new CompositeTermsAggregation
+                                   {
+                                       Field = field,
+                                   }
+                               } } };
+                               compositeAggregation.Sources.Add(compositeAggregationSources);
+                           });
 
-                                    return so;
-                                })
-                                .Aggregations(aa => aa
-                                    .TopHits("data_composite", th => th)   
-                                )
-                            );
+                           ad.Aggregations(aa =>
+                               aa.Add("data_composite", th => th.TopHits(new TopHitsAggregation())));
 
-                        return a;
-                    });
+                           ad.Composite(compositeAggregation);
 
+                       })
+                    );
                 }
-                
-                return descriptor;
+            })
+            .Result;
 
-            });
-            
             if (queryModel.SelectClause?.Selector is MemberExpression)
             {
-                return JsonConvert.DeserializeObject<IEnumerable<T>>(
-                    JsonConvert.SerializeObject(documents.Documents.SelectMany(x => x.Values)),
-                    _deserializerSettings
-                );
+                return _sourceSerializer.Deserialize<IEnumerable<T>>(
+                    _sourceSerializer.SerializeToBytes(documents.Documents.SelectMany(x => x.Values)));
             }
 
             if (queryAggregator.GroupByExpressions.Any())
             {
-                var docDeserializer = new Func<object, TK>(input => 
-                    JsonConvert.DeserializeObject<TK>(JsonConvert.SerializeObject(input), _deserializerSettings));
-
                 var originalGroupingType = queryModel.GetResultType().GenericTypeArguments.First();
                 var originalGroupingGenerics = originalGroupingType.GetGenericArguments();
                 var originalKeyGenerics = originalGroupingGenerics.First();
 
                 var genericListType = typeof(List<>).MakeGenericType(originalGroupingType);
                 var values = (IList)Activator.CreateInstance(genericListType);
-                
-                var composite = documents.Aggregations.Composite("composite");
-            
-                foreach(var bucket in composite.Buckets)
+
+                var composite = documents.Aggregations["composite"] as CompositeAggregate;
+
+                foreach (var bucket in composite.Buckets)
                 {
                     var key = GenerateKey(bucket.Key, originalKeyGenerics);
-                    var list = bucket.TopHits("data_composite").Documents<object>().Select(docDeserializer).ToList();
+                    var list = ((TopHitsAggregate)bucket.Aggregations["data_composite"]).Hits.Hits.Select(d =>
+                        _sourceSerializer.Deserialize<TK>((JsonElement)d.Source)).ToList();
 
                     var grouping = typeof(Grouping<,>);
                     var groupingGenerics = grouping.MakeGenericType(originalGroupingGenerics);
                     var groupingInstance = Activator.CreateInstance(groupingGenerics, key, list);
                     values.Add(groupingInstance);
                 }
-                
+
                 return values.Cast<T>();
             }
 
-            var result = JsonConvert.DeserializeObject<IEnumerable<T>>(
-                JsonConvert.SerializeObject(documents.Documents, Formatting.Indented), 
-                _deserializerSettings
-            );
+            return _sourceSerializer.Deserialize<IEnumerable<T>>(_sourceSerializer.SerializeToBytes(documents.Documents));
 
-            return result;
         }
 
         public T ExecuteSingle<T>(QueryModel queryModel, bool returnDefaultWhenEmpty)
@@ -185,7 +181,7 @@ namespace LinqToElasticSearch
             return returnDefaultWhenEmpty ? sequence.SingleOrDefault() : sequence.Single();
         }
 
-        public T ExecuteScalar<T>(QueryModel queryModel) 
+        public T ExecuteScalar<T>(QueryModel queryModel)
         {
             var queryAggregator = _elasticGeneratorQueryModelVisitor.GenerateElasticQuery<T>(queryModel);
 
@@ -193,22 +189,22 @@ namespace LinqToElasticSearch
             {
                 if (resultOperator is CountResultOperator)
                 {
-                    var result = _elasticClient.Count<object>(descriptor =>
+                    var result = _elasticClient.CountAsync<T>(descriptor =>
                     {
-                        descriptor.Index(_dataId);
-                    
+                        //descriptor.Index(_dataId);
+
                         if (queryAggregator.Query != null)
                         {
-                            descriptor.Query(q => queryAggregator.Query);
+                            descriptor.Query(queryAggregator.Query);
                         }
-                        return descriptor;
-                    }).Count;
+                        //return descriptor;
+                    }).Result.Count;
 
                     if (result > ElasticQueryLimit)
                     {
                         result = ElasticQueryLimit;
                     }
-                    
+
                     var converter = TypeDescriptor.GetConverter(typeof(T));
                     if (converter.CanConvertFrom(typeof(string)))
                     {
@@ -216,41 +212,40 @@ namespace LinqToElasticSearch
                     }
                 }
             }
-            
+
             return default(T);
         }
 
-        private dynamic GenerateKey(CompositeKey ck, Type keyGenerics)
+        private dynamic GenerateKey(IReadOnlyDictionary<string, FieldValue> ck, Type keyGenerics)
         {
             if (keyGenerics.IsConstructedGenericType == false)
             {
                 if (keyGenerics == typeof(DateTime))
-                {            
-                    var date = (long) ck.Values.First();
-                    return FormatDateTimeKey(date);
+                {
+                    var date = ck.Values.First();
+                    return FormatDateTimeKey((long)date.Value);
                 }
-                return ck.Values.First();
+                return ck.Values.First().Value;
             }
-            
+
             IDictionary<string, object> expando = new ExpandoObject();
             foreach (var entry in ck)
             {
                 var key = entry.Key.Replace("group_by_", "");
                 var type = keyGenerics.GetProperties().FirstOrDefault(x => x.Name == key)?.PropertyType;
-                
+
                 if (type != null && type == typeof(DateTime))
-                {            
-                    var date = (long) entry.Value;
+                {
+                    var date = (long)entry.Value.Value;
                     expando[key] = FormatDateTimeKey(date);
                     continue;
                 }
-                
-                expando[key] = entry.Value;
+
+                expando[key] = entry.Value.Value;
             }
 
-            return JsonConvert.DeserializeObject(JsonConvert.SerializeObject(expando), keyGenerics);
+            return JsonSerializer.Deserialize(JsonSerializer.Serialize(expando), keyGenerics);
         }
-
         private static DateTime FormatDateTimeKey(long d)
         {
             var date = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Local);
@@ -261,7 +256,7 @@ namespace LinqToElasticSearch
     public class Grouping<TKey, TElem> : IGrouping<TKey, TElem>
     {
         public TKey Key { get; }
-        
+
         private readonly IEnumerable<TElem> _values;
 
         public Grouping(TKey key, IEnumerable<TElem> values)

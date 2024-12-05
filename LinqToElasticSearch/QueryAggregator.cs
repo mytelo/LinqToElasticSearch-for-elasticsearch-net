@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using Nest;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Remotion.Linq.Clauses;
 
 namespace LinqToElasticSearch
 {
     public class QueryAggregator
     {
-        public QueryContainer Query { get; set; }
+        public Query Query { get; set; }
         public int? Take { get; set; }
         public int? Skip { get; set; }
         public List<string> PropertiesToSelect = new List<string>();
