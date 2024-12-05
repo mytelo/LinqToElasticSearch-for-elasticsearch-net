@@ -44,7 +44,8 @@ namespace LinqToElasticSearch
             {
                 descriptor.Index(_dataId);
 
-                if (queryModel.SelectClause != null && queryModel.SelectClause.Selector is MemberExpression memberExpression)
+                if (queryModel.SelectClause != null &&
+                    queryModel.SelectClause.Selector is MemberExpression memberExpression)
                 {
                     descriptor.Source(new SourceConfig(new SourceFilter
                     {
@@ -72,7 +73,6 @@ namespace LinqToElasticSearch
                         take -= exceedCount;
                     }
 
-                    descriptor.From(take);
                     descriptor.Size(take);
                 }
 
@@ -106,37 +106,41 @@ namespace LinqToElasticSearch
                 if (queryAggregator.GroupByExpressions.Any())
                 {
                     descriptor.Aggregations(a =>
-                       a.Add("composite", ad =>
-                       {
-                           var compositeAggregation = new CompositeAggregation
-                           {
-                               Sources = new List<IDictionary<string, CompositeAggregationSource>>()
-                           };
-                           queryAggregator.GroupByExpressions.ForEach(gbe =>
-                           {
-                               var field = _propertyNameInferrerParser.Parser(gbe.ElasticFieldName) + gbe.GetKeywordIfNecessary();
+                        a.Add("composite", ad =>
+                        {
+                            var compositeAggregation = new CompositeAggregation
+                            {
+                                Sources = new List<IDictionary<string, CompositeAggregationSource>>()
+                            };
+                            queryAggregator.GroupByExpressions.ForEach(gbe =>
+                            {
+                                var field = _propertyNameInferrerParser.Parser(gbe.ElasticFieldName) +
+                                            gbe.GetKeywordIfNecessary();
 
-                               var compositeAggregationSources = new Dictionary<string, CompositeAggregationSource>
-                               { { $"group_by_{gbe.PropertyName}", new CompositeAggregationSource
-                               {
-                                   Terms = new CompositeTermsAggregation
-                                   {
-                                       Field = field,
-                                   }
-                               } } };
-                               compositeAggregation.Sources.Add(compositeAggregationSources);
-                           });
+                                var compositeAggregationSources = new Dictionary<string, CompositeAggregationSource>
+                                {
+                                    {
+                                        $"group_by_{gbe.PropertyName}", new CompositeAggregationSource
+                                        {
+                                            Terms = new CompositeTermsAggregation
+                                            {
+                                                Field = field,
+                                            }
+                                        }
+                                    }
+                                };
+                                compositeAggregation.Sources.Add(compositeAggregationSources);
+                            });
 
-                           ad.Aggregations(aa =>
-                               aa.Add("data_composite", th => th.TopHits(new TopHitsAggregation())));
+                            ad.Aggregations(aa =>
+                                aa.Add("data_composite", th => th.TopHits(new TopHitsAggregation())));
 
-                           ad.Composite(compositeAggregation);
+                            ad.Composite(compositeAggregation);
 
-                       })
+                        })
                     );
                 }
-            })
-            .Result;
+            }).Result;
 
             if (queryModel.SelectClause?.Selector is MemberExpression)
             {
@@ -178,7 +182,7 @@ namespace LinqToElasticSearch
         {
             var sequence = ExecuteCollection<T>(queryModel);
 
-            return returnDefaultWhenEmpty ? sequence.SingleOrDefault() : sequence.Single();
+            return returnDefaultWhenEmpty ? sequence.FirstOrDefault() : sequence.First();
         }
 
         public T ExecuteScalar<T>(QueryModel queryModel)
@@ -191,13 +195,12 @@ namespace LinqToElasticSearch
                 {
                     var result = _elasticClient.CountAsync<T>(descriptor =>
                     {
-                        //descriptor.Index(_dataId);
+                        descriptor.Indices(_dataId);
 
                         if (queryAggregator.Query != null)
                         {
                             descriptor.Query(queryAggregator.Query);
                         }
-                        //return descriptor;
                     }).Result.Count;
 
                     if (result > ElasticQueryLimit)

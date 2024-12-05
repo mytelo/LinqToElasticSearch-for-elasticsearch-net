@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using Elastic.Clients.Elasticsearch.Serialization;
 using LinqToElasticSearch.JsonConverter;
 
 namespace LinqToElasticSearch.IntegrationTests
@@ -18,6 +19,9 @@ namespace LinqToElasticSearch.IntegrationTests
         public DateTimeOffset? DateOffset1 { get; set; }
 
         //enum to int 
+        /// <summary>
+        /// es-client mapping default type is "string"，if want type is "int" please and '[JsonConverter(typeof(JsonEnumConverter))]'
+        /// </summary>
         [JsonConverter(typeof(JsonEnumConverter))]
         public SampleType SampleTypeProperty { get; set; }
 
@@ -33,8 +37,11 @@ namespace LinqToElasticSearch.IntegrationTests
 
         public IList<string> Emails { get; set; }
 
-
-        //enum default string
+        /// <summary>
+        /// es-client mapping default type is "string"，if want type is "int" please and '[JsonConverter(typeof(JsonEnumConverter))]'
+        /// at "Where" enum  default type is "int" ,add '[StringEnum]' convert to "string
+        /// </summary>
+        [StringEnum]
         public SampleType SampleTypePropertyString { get; set; }
     }
 

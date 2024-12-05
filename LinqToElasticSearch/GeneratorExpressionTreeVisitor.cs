@@ -31,7 +31,10 @@ namespace LinqToElasticSearch
         {
             if (expression.NodeType == ExpressionType.Not)
             {
-                Not = true;
+                if (expression.Operand.NodeType != ExpressionType.MemberAccess)
+                {
+                    Not = true;
+                }
                 Value = false;
             }
 
@@ -75,21 +78,21 @@ namespace LinqToElasticSearch
                 var right = QueryMap[expression.Right];
 
                 //true
-                if (left is TermNode ltn && ltn.Value is bool lbv && lbv == true)
+                if (left is TermNode ltn && ltn.Field == null && ltn.Value is bool lbv && lbv == true)
                 {
                     right = null;
                 }
-                if (right is TermNode rtn && rtn.Value is bool rbv && rbv == true)
+                if (right is TermNode rtn && rtn.Field == null && rtn.Value is bool rbv && rbv == true)
                 {
                     left = null;
                 }
 
                 //false
-                if (left is TermNode ltn2 && ltn2.Value is bool lbv2 && lbv2 == false)
+                if (left is TermNode ltn2 && ltn2.Field == null && ltn2.Value is bool lbv2 && lbv2 == false)
                 {
                     left = null;
                 }
-                if (right is TermNode rtn2 && rtn2.Value is bool rbv2 && rbv2 == false)
+                if (right is TermNode rtn2 && rtn2.Field == null && rtn2.Value is bool rbv2 && rbv2 == false)
                 {
                     right = null;
                 }
@@ -117,21 +120,21 @@ namespace LinqToElasticSearch
                 var right = QueryMap[expression.Right];
 
                 //false
-                if (left is TermNode ltn && ltn.Value is bool lbv && lbv == false)
+                if (left is TermNode ltn && ltn.Field == null && ltn.Value is bool lbv && lbv == false)
                 {
                     right = null;
                 }
-                if (right is TermNode rtn && rtn.Value is bool rbv && rbv == false)
+                if (right is TermNode rtn && rtn.Field == null && rtn.Value is bool rbv && rbv == false)
                 {
                     left = null;
                 }
 
                 //true
-                if (left is TermNode ltn2 && ltn2.Value is bool lbv2 && lbv2 == true)
+                if (left is TermNode ltn2 && ltn2.Field == null && ltn2.Value is bool lbv2 && lbv2 == true)
                 {
                     left = null;
                 }
-                if (right is TermNode rtn2 && rtn2.Value is bool rbv2 && rbv2 == true)
+                if (right is TermNode rtn2 && rtn2.Field == null && rtn2.Value is bool rbv2 && rbv2 == true)
                 {
                     right = null;
                 }
@@ -152,6 +155,7 @@ namespace LinqToElasticSearch
                 {
                     node = left;
                 }
+
             }
 
             if (node != null)
