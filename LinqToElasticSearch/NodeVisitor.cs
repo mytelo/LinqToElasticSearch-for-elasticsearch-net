@@ -153,6 +153,11 @@ namespace LinqToElasticSearch
             };
         }
 
+        public Query Visit(QueryMatchNode node)
+        {
+            return node.QueryConfig.GetQuery();
+        }
+
         public Query Visit(MultiMatchNode node)
         {
             return new MultiMatchQuery

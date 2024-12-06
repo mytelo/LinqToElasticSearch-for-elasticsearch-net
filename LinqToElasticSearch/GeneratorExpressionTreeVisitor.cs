@@ -18,6 +18,7 @@ namespace LinqToElasticSearch
         private string PropertyName { get; set; }
         private Type PropertyType { get; set; }
         private bool Not { get; set; }
+        private QueryConfig QueryConfig { get; set; }
 
         public IDictionary<Expression, Node> QueryMap { get; } =
             new Dictionary<Expression, Node>();
@@ -168,7 +169,15 @@ namespace LinqToElasticSearch
 
         protected override Expression VisitConstant(ConstantExpression expression)
         {
-            Value = expression.Value;
+            if (expression.Type.BaseType == typeof(QueryConfig))
+            {
+                QueryConfig = (QueryConfig)expression.Value;
+            }
+            else
+            {
+                Value = expression.Value;
+            }
+            
             HandleExpression(expression);
             return expression;
         }
@@ -194,6 +203,13 @@ namespace LinqToElasticSearch
                     Visit(expression.Object);
                     Visit(expression.Arguments[0]);
                     HandleEndsWith(expression);
+                    break;
+                case "MatchQuery":
+                    Visit(expression.Object);
+                    Visit(expression.Arguments[0]);
+                    Visit(expression.Arguments[1]);
+                    Visit(expression.Arguments[2]);
+                    HandleMatchQuery(expression);
                     break;
                 default:
                     return base.VisitMethodCall(expression); // throws
@@ -600,6 +616,15 @@ namespace LinqToElasticSearch
         private void HandleEndsWith(Expression expression)
         {
             var query = new QueryStringNode(PropertyName, "*" + Value);
+            QueryMap[expression] = ParseQuery(query);
+        }
+
+        private void HandleMatchQuery(Expression expression)
+        {
+            QueryConfig.Field = PropertyName;
+            QueryConfig.Query = Value;
+
+            var query = new QueryMatchNode(PropertyName, Value, QueryConfig);
             QueryMap[expression] = ParseQuery(query);
         }
 

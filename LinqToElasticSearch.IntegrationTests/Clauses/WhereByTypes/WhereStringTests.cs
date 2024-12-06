@@ -29,6 +29,32 @@ namespace LinqToElasticSearch.IntegrationTests.Clauses.WhereByTypes
             listResults.Count.Should().Be(1);
             listResults[0].Name.Should().Be(datas[0].Name);
         }
+
+        [Fact]
+        public void WhereKeyword()
+        {
+            //Given
+            var datas = Fixture.CreateMany<SampleData>().ToList();
+            
+            datas[0].Name = "【市场价2532】HUAWEI WATCH 2 Pro 4G智能手表 移动支付";
+            datas[1].Name = "【市场价8199】HUAWEI Pura 70 Pro 5G智能手机 移动智慧生活";
+            datas[2].Name = "abcdef ghi";
+            
+            Bulk(datas);
+
+            ElasticClient.Indices.Refresh();
+
+            //When
+            var results = Sut.Where(x =>x.Name== "abcdef ghi" || Keyword.MatchQuery(x.Name, "智能手表",new MatchQueryConfig
+            {
+                Analyzer = "ik_smart"
+            }));
+            var listResults = results.ToList();
+
+            //Then
+            listResults.Count.Should().Be(1);
+            listResults[0].Name.Should().Be(datas[0].Name);
+        }
         
         [Fact]
         public void WhereStringNotEqual()

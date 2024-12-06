@@ -38,7 +38,8 @@ namespace LinqToElasticSearch.IntegrationTests
 
             var map = new TypeMappingDescriptor<SampleData>();
             map.Properties(p => p
-                .Text(t => t.Name, c=>c.Fields(p2=>p2.Keyword("keyword")))
+                .Text(t => t.Name, c=>
+                    c.Fields(p2=>p2.Keyword("keyword")).Analyzer("ik_smart").SearchAnalyzer("ik_smart"))
                 .Text(t => t.LastName, c => c.Fields(p2 => p2.Keyword("keyword")))
                 .Keyword(t => t.Id)
                 .Keyword(t => t.Emails)
