@@ -4,15 +4,11 @@ namespace LinqToElasticSearch
 {
     public class QueryMatchNode : Node
     {
-        public string Field { get; set; }
-        public object Value { get; set; }
         public QueryConfig QueryConfig { get; set; }
 
 
-        public QueryMatchNode(string field, object value, QueryConfig queryConfig)
+        public QueryMatchNode(QueryConfig queryConfig)
         {
-            Field = field;
-            Value = value;
             QueryConfig = queryConfig;
         }
 

@@ -99,7 +99,7 @@
     <Compile Include="GeneratorExpressionTreeVisitor.cs" />
     <Compile Include="INodeVisitor.cs" />
     <Compile Include="JsonConverter\JsonEnumConverter.cs" />
-    <Compile Include="Keyword.cs" />
+    <Compile Include="Match.cs" />
     <Compile Include="MatchPhraseNode.cs" />
     <Compile Include="MultiMatchNode.cs" />
     <Compile Include="Node.cs" />
@@ -112,6 +112,7 @@
     <Compile Include="PropertyNameInferrerParser.cs" />
     <Compile Include="QueryAggregator.cs" />
     <Compile Include="QueryConfig.cs" />
+    <Compile Include="MultiMatchQueryNode.cs" />
     <Compile Include="QueryMatchNode.cs" />
     <Compile Include="QueryStringNode.cs" />
     <Compile Include="TermNode.cs" />

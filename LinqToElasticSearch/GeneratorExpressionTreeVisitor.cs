@@ -19,6 +19,7 @@ namespace LinqToElasticSearch
         private Type PropertyType { get; set; }
         private bool Not { get; set; }
         private QueryConfig QueryConfig { get; set; }
+        private MultiMatchQueryConfig MultiMatchQueryConfig { get; set; }
 
         public IDictionary<Expression, Node> QueryMap { get; } =
             new Dictionary<Expression, Node>();
@@ -173,11 +174,15 @@ namespace LinqToElasticSearch
             {
                 QueryConfig = (QueryConfig)expression.Value;
             }
+            else if (expression.Type == typeof(MultiMatchQueryConfig))
+            {
+                MultiMatchQueryConfig = (MultiMatchQueryConfig)expression.Value;
+            }
             else
             {
                 Value = expression.Value;
             }
-            
+
             HandleExpression(expression);
             return expression;
         }
@@ -210,6 +215,12 @@ namespace LinqToElasticSearch
                     Visit(expression.Arguments[1]);
                     Visit(expression.Arguments[2]);
                     HandleMatchQuery(expression);
+                    break;
+                case "MultiMatchQuery":
+                    Visit(expression.Object);
+                    Visit(expression.Arguments[1]);
+                    Visit(expression.Arguments[2]);
+                    HandleMultiMatchQuery(expression);
                     break;
                 default:
                     return base.VisitMethodCall(expression); // throws
@@ -450,7 +461,7 @@ namespace LinqToElasticSearch
             var tempProperty = PropertyName;
             if (PropertyType != null && PropertyType.ToString().ToLower().Contains("string"))
             {
-                tempProperty = tempProperty + ".keyword";
+                tempProperty += ".keyword";
             }
             if (Value is Guid guid)
             {
@@ -623,8 +634,15 @@ namespace LinqToElasticSearch
         {
             QueryConfig.Field = PropertyName;
             QueryConfig.Query = Value;
+            var query = new QueryMatchNode(QueryConfig);
+            QueryMap[expression] = ParseQuery(query);
+        }
 
-            var query = new QueryMatchNode(PropertyName, Value, QueryConfig);
+        private void HandleMultiMatchQuery(Expression expression)
+        {
+            MultiMatchQueryConfig.Query = Value;
+
+            var query = new MultiMatchQueryNode(MultiMatchQueryConfig);
             QueryMap[expression] = ParseQuery(query);
         }
 

@@ -170,6 +170,11 @@ namespace LinqToElasticSearch
             };
         }
 
+        public Query Visit(MultiMatchQueryNode node)
+        {
+            return node.MultiMatchQueryConfig.GetQuery();
+        }
+
         private FieldValue GetFieldValue(object value)
         {
             switch (value)

@@ -19,5 +19,6 @@ namespace LinqToElasticSearch
         Query Visit(QueryStringNode node);
         Query Visit(QueryMatchNode node);
         Query Visit(MultiMatchNode node);
+        Query Visit(MultiMatchQueryNode node);
     }
 }
