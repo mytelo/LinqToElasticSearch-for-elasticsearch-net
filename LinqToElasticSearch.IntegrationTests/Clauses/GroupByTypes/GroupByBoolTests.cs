@@ -23,7 +23,7 @@ namespace LinqToElasticSearch.IntegrationTests.Clauses.GroupByTypes
             ElasticClient.Indices.Refresh();
             
             //When
-            var results = Sut.GroupBy(x => x.Can).ToList();
+            var results = Sut.GroupBy(x => x.Can).ToResultList();
             
             //Then
             results.Count.Should().Be(2);

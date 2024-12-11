@@ -18,7 +18,7 @@ namespace LinqToElasticSearch.IntegrationTests.Clauses
             ElasticClient.Indices.Refresh();
             
             //When
-            var results = Sut.Skip(5).ToList();
+            var results = Sut.Skip(5).ToResultList();
 
             //Then
             results.Count().Should().Be(6);

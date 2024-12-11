@@ -19,7 +19,7 @@ namespace LinqToElasticSearch.IntegrationTests.Clauses
             
             //When
             var results = from i in Sut select i;
-            var listResults = results.ToList();
+            var listResults = results.ToResultList();
 
             //Then
             listResults.Count.Should().Be(1);
@@ -54,11 +54,11 @@ namespace LinqToElasticSearch.IntegrationTests.Clauses
             ElasticClient.Indices.Refresh();
             
             //When
-            var results = Sut.Select(x => x.Id);
-            var listResults = results.ToList();
+            var results = Sut.Take(3).Select(x => x.Id);
+            var listResults = results.ToResultList();
 
             //Then
-            listResults.Count.Should().Be(15);
+            listResults.Count.Should().Be(3);
         }
     }
 }

@@ -14,14 +14,14 @@ namespace LinqToElasticSearch.IntegrationTests.Clauses.WhereByTypes
             var datas = Fixture.CreateMany<SampleData>().ToList();
             datas[0].Can = false;
             datas[1].Can = true;
-            datas[2].Can = false;
+            datas[2].Can = true;
 
             Bulk(datas);
             ElasticClient.Indices.Refresh();
 
             //When
-            var results = Sut.Where(x => x.Can);
-            var listResults = results.ToList();
+            var results = Sut.Where(x => x.Can).Skip(1);
+            var listResults = results.ToResultList();
 
             //Then
             listResults.Count.Should().Be(1);

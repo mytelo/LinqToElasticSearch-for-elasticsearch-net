@@ -144,8 +144,12 @@ namespace LinqToElasticSearch
 
             if (queryModel.SelectClause?.Selector is MemberExpression)
             {
-                return _sourceSerializer.Deserialize<IEnumerable<T>>(
+                var selectResult = _sourceSerializer.Deserialize<ElasticResultList<T>>(
                     _sourceSerializer.SerializeToBytes(documents.Documents.SelectMany(x => x.Values)));
+                selectResult.Skip = queryAggregator.Skip ?? 0;
+                selectResult.Take = queryAggregator.Take ?? 0;
+                selectResult.Total = documents.Total;
+                return selectResult;
             }
 
             if (queryAggregator.GroupByExpressions.Any())
@@ -154,8 +158,11 @@ namespace LinqToElasticSearch
                 var originalGroupingGenerics = originalGroupingType.GetGenericArguments();
                 var originalKeyGenerics = originalGroupingGenerics.First();
 
-                var genericListType = typeof(List<>).MakeGenericType(originalGroupingType);
-                var values = (IList)Activator.CreateInstance(genericListType);
+                var genericListType = typeof(ElasticResultList<>).MakeGenericType(originalGroupingType);
+                var values = (ElasticResultList<T>)Activator.CreateInstance(genericListType);
+                values.Skip = queryAggregator.Skip ?? 0;
+                values.Take = queryAggregator.Take ?? 0;
+                values.Total = documents.Total;
 
                 var composite = documents.Aggregations["composite"] as CompositeAggregate;
 
@@ -171,10 +178,17 @@ namespace LinqToElasticSearch
                     values.Add(groupingInstance);
                 }
 
-                return values.Cast<T>();
+                return values;
             }
 
-            return _sourceSerializer.Deserialize<IEnumerable<T>>(_sourceSerializer.SerializeToBytes(documents.Documents));
+            var result =
+                _sourceSerializer.Deserialize<ElasticResultList<T>>(_sourceSerializer.SerializeToBytes(documents.Documents));
+            result.Skip = queryAggregator.Skip ?? 0;
+            result.Take = queryAggregator.Take ?? 0;
+            result.Total = documents.Total;
+
+            return result;
+            //return _sourceSerializer.Deserialize<IEnumerable<T>>(_sourceSerializer.SerializeToBytes(documents.Documents));
 
         }
 
