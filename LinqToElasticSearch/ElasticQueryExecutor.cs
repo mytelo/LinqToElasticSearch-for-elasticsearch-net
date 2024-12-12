@@ -146,9 +146,9 @@ namespace LinqToElasticSearch
             {
                 var selectResult = _sourceSerializer.Deserialize<ElasticResultList<T>>(
                     _sourceSerializer.SerializeToBytes(documents.Documents.SelectMany(x => x.Values)));
-                selectResult.Skip = queryAggregator.Skip ?? 0;
-                selectResult.Take = queryAggregator.Take ?? 0;
-                selectResult.Total = documents.Total;
+                selectResult.SkipCount = queryAggregator.Skip ?? 0;
+                selectResult.TakeCount = queryAggregator.Take ?? 0;
+                selectResult.TotalCount = documents.Total;
                 return selectResult;
             }
 
@@ -160,9 +160,9 @@ namespace LinqToElasticSearch
 
                 var genericListType = typeof(ElasticResultList<>).MakeGenericType(originalGroupingType);
                 var values = (ElasticResultList<T>)Activator.CreateInstance(genericListType);
-                values.Skip = queryAggregator.Skip ?? 0;
-                values.Take = queryAggregator.Take ?? 0;
-                values.Total = documents.Total;
+                values.SkipCount = queryAggregator.Skip ?? 0;
+                values.TakeCount = queryAggregator.Take ?? 0;
+                values.TotalCount = documents.Total;
 
                 var composite = documents.Aggregations["composite"] as CompositeAggregate;
 
@@ -183,9 +183,9 @@ namespace LinqToElasticSearch
 
             var result =
                 _sourceSerializer.Deserialize<ElasticResultList<T>>(_sourceSerializer.SerializeToBytes(documents.Documents));
-            result.Skip = queryAggregator.Skip ?? 0;
-            result.Take = queryAggregator.Take ?? 0;
-            result.Total = documents.Total;
+            result.SkipCount = queryAggregator.Skip ?? 0;
+            result.TakeCount = queryAggregator.Take ?? 0;
+            result.TotalCount = documents.Total;
 
             return result;
             //return _sourceSerializer.Deserialize<IEnumerable<T>>(_sourceSerializer.SerializeToBytes(documents.Documents));

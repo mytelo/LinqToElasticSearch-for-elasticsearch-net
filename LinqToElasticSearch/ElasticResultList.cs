@@ -7,11 +7,11 @@ namespace LinqToElasticSearch
     [Serializable]
     public class ElasticResultList<T> :List<T>
     {
-        public int Skip { get; set; }
+        public int SkipCount { get; set; }
 
-        public int Take { get; set; }
+        public int TakeCount { get; set; }
 
-        public long Total { get; set; }
+        public long TotalCount { get; set; }
     }
 
     public static class ElasticResultListExtension
